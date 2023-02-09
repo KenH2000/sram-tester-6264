@@ -17,7 +17,7 @@
  * IC Pin 14 (Vss) is jumpered to GND (the inline MEGA pin is set to INPUT to prevent damage)
  * IC Pin 20 (CS) set on MEGA to OUTPUT LOW
  * IC Pin 22 (OE) set on MEGA to OUTPUT LOW
- * IC Pin 28 (Vcc) is jumpered VCC    (the inline MEGA pin is set to INPUT to prevent damage)
+ * IC Pin 28 (Vcc) is jumpered to VCC (the inline MEGA pin is set to INPUT to prevent damage)
 */
 
 struct WritePin {
