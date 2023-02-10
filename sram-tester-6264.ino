@@ -1,23 +1,23 @@
-// SPDX-License-Identifier: MIT
-
-/*
+/***************************************************************************
  * Universal Static RAM Tester - Tests SRAM by writing and reading patterns
- * 
- * Derived from the 2114 SRAM tester by Carsten Skjerk
+ * This is a modified version of the original testers:
+ * derived from the 2114 SRAM tester by Carsten Skjerk
  * https://github.com/skjerk/Arduino-2114-SRAM-tester
- * 
+ * ***AND****
  * (c) Dennis Marttinen 2022
  * Licensed under the MIT license
- * 
- * This is a modified version to test 6264 SRAM
+ * https://github.com/twelho/sram-tester
+ ***************************************************************************
+ * This version tests the 6264 SRAM
+ * and adds options to test the full pattern and other (FASTER) patterns.
  * 
  * The pin arrangement is organized so a ZIF socket can be mounted  
  * on a stripboard and directly plugged in to the MEGA 36 pin connector. 
  * 6264 SRAM (ATMega 2560 pinout)
- * IC Pin 14 (Vss) is jumpered to GND (the inline MEGA pin is set to INPUT to prevent damage)
+ * IC Pin 14 (Vss) is jumpered to GND (MEGA pin is set to INPUT)
  * IC Pin 20 (CS) set on MEGA to OUTPUT LOW
  * IC Pin 22 (OE) set on MEGA to OUTPUT LOW
- * IC Pin 28 (Vcc) is jumpered to VCC (the inline MEGA pin is set to INPUT to prevent damage)
+ * IC Pin 28 (Vcc) is jumpered to VCC (MEGA pin is set to INPUT)
 */
 
 struct WritePin {
@@ -136,7 +136,7 @@ void setup() {
   
   // Initialize Serial Port
   Serial.begin(115200);
-  Serial.println("Universal Static RAM Tester by Dennis Marttinen");
+  Serial.println("Universal Static RAM Tester");
   Serial.print(NA);
   Serial.print('/');
   Serial.print(ND);
@@ -246,6 +246,37 @@ void printU64(uint64_t value) {
 }
 
 void loop() {
+  byte subcommand;
+Serial.println("Choose Test Pattern:");
+Serial.println("F = Full Test (SLOW)");
+Serial.println("A = Alt  Test (FAST)");
+Serial.println("1 = 1's (FAST)");
+Serial.println("0 = 0's (FAST)");
+Serial.println("Enter Test Pattern (F,A,1 or 0):");
+ do
+      {
+      subcommand = toupper (Serial.read ());
+      } while (subcommand != 'F' && subcommand != 'A' && subcommand != '1'  && subcommand != '0' );
+    
+    if (subcommand == 'F') {fulltest();}
+    if (subcommand == 'A') {
+      int patterns[]={0xAA,0x55,0x00,0xFF};
+      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
+      testpattern(patterns,arrsz);
+    }
+    if (subcommand == '1') {
+      int patterns[]={0xFF};
+      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
+      testpattern(patterns,arrsz);
+    }
+    if (subcommand == '0') {
+      int patterns[]={0x00};
+      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
+      testpattern(patterns,arrsz);
+    }
+}
+
+void fulltest(){
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
@@ -282,7 +313,7 @@ void loop() {
     }
   }
   
-  Serial.println("Test complete");
+  Serial.println("Test complete*****************");
   printU64(errorCount);
   Serial.print(" errors found (");
   Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
@@ -293,7 +324,57 @@ void loop() {
     Serial.print(" to 0x");
     Serial.println(lastError, HEX);
   }
-
-  // Nothing more to do, so loop indefinitely - or until Reset is pressed
-  while (1) {};
+  Serial.println("******************************");
 }
+
+
+void testpattern(int patterns[],int arrsz){
+  uint32_t firstError = 0;
+  uint32_t lastError = 0;
+  uint64_t errorCount = 0;
+  // Use values for patterns array
+   for (size_t i = 0; i < arrsz; i++) {
+    Serial.print("Running test pattern ");
+    printBinary(patterns[i]);
+    Serial.println();
+    
+    // Loop through all addresses in the SRAM
+    for (uint32_t addr = 0; addr < addressCount; addr++) {
+      // Write test pattern to the SRAM
+      writeData(addr, patterns[i]);
+      
+      // Read data from the SRAM
+      size_t data = readData(addr);
+
+      // Verify
+      if (data != patterns[i]) {
+        lastError = addr;
+        if (errorCount++ == 0) {
+          firstError = addr;
+        }
+        
+        Serial.print("Error at address 0x");
+        Serial.print(addr, HEX);
+        Serial.print(" - Got: ");
+        printBinary(data);
+        Serial.print(", expected: ");
+        printBinary(patterns[i]);
+        Serial.println();
+      }
+    }
+  }
+  
+  Serial.println("Test complete*****************");
+  printU64(errorCount);
+  Serial.print(" errors found (");
+  Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
+  Serial.println("% failed)");
+  if (errorCount > 0) {
+    Serial.print("Error span: 0x");
+    Serial.print(firstError, HEX);
+    Serial.print(" to 0x");
+    Serial.println(lastError, HEX);
+  }
+  Serial.println("******************************");
+}
+
