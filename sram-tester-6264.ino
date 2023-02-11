@@ -221,6 +221,8 @@ void printU64(uint64_t value) {
 
 void loop() {
   byte subcommand;
+  #define ELS(x)   (sizeof(x) / sizeof(x[0]))
+  int patterns[]={0xAA,0x55,0x00,0xFF};
 Serial.println("Choose Test Pattern:");
 Serial.println("F = Full Test (SLOW)");
 Serial.println("A = Alt  Test (FAST)");
@@ -230,24 +232,11 @@ Serial.println("Enter Test Pattern (F,A,1 or 0):");
  do
       {
       subcommand = toupper (Serial.read ());
-      } while (subcommand != 'F' && subcommand != 'A' && subcommand != '1'  && subcommand != '0' );
-    
+      } while (subcommand != 'F' && subcommand != 'A' && subcommand != '1'  && subcommand != '0' && subcommand != ' ' );    
     if (subcommand == 'F') {fulltest();}
-    if (subcommand == 'A') {
-      int patterns[]={0xAA,0x55,0x00,0xFF};
-      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
-      testpattern(patterns,arrsz);
-    }
-    if (subcommand == '1') {
-      int patterns[]={0xFF};
-      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
-      testpattern(patterns,arrsz);
-    }
-    if (subcommand == '0') {
-      int patterns[]={0x00};
-      int arrsz = sizeof(patterns) / sizeof((patterns)[0]);
-      testpattern(patterns,arrsz);
-    }
+    if (subcommand == 'A') {testpattern(patterns,0,4);}
+    if (subcommand == '1') {testpattern(patterns,3,4);}
+    if (subcommand == '0') {testpattern(patterns,2,3);}
 }
 
 void fulltest(){
@@ -302,12 +291,12 @@ void fulltest(){
 }
 
 
-void testpattern(int patterns[],int arrsz){
+void testpattern(int patterns[],int a, int b){
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
   // Use values for patterns array
-   for (size_t i = 0; i < arrsz; i++) {
+   for (size_t i = a; i < b; i++) {
     Serial.print("Running test pattern ");
     printBinary(patterns[i]);
     Serial.println();
