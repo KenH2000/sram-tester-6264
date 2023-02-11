@@ -49,6 +49,8 @@ const WritePin writePins[] = {
 
 // The number of addressable memory locations
 const uint32_t addressCount = 8192;
+
+int ledpin=13;
 // ------------------------------
 
 #define NX(x) (sizeof(x) / sizeof((x)[0]))
@@ -66,6 +68,7 @@ void specialpins() {
     digitalWrite(gpins[i],LOW);
     pinMode(ipins[i],INPUT);
   }
+pinMode(ledpin,OUTPUT);
 }
 
 // Set Address pins to output
@@ -240,6 +243,7 @@ Serial.println("Enter Test Pattern (F,A,1 or 0):");
 }
 
 void fulltest(){
+  digitalWrite(ledpin,LOW);
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
@@ -281,7 +285,9 @@ void fulltest(){
   Serial.print(" errors found (");
   Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
   Serial.println("% failed)");
+  digitalWrite(ledpin,HIGH);
   if (errorCount > 0) {
+    digitalWrite(ledpin,LOW);
     Serial.print("Error span: 0x");
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
@@ -292,6 +298,7 @@ void fulltest(){
 
 
 void testpattern(int patterns[],int a, int b){
+  digitalWrite(ledpin,LOW);
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
@@ -332,7 +339,9 @@ void testpattern(int patterns[],int a, int b){
   Serial.print(" errors found (");
   Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
   Serial.println("% failed)");
+  digitalWrite(ledpin,HIGH);
   if (errorCount > 0) {
+    digitalWrite(ledpin,LOW);
     Serial.print("Error span: 0x");
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
