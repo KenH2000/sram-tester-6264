@@ -24,6 +24,6 @@ The pin arrangement is optimized so a stripboard-mounted ZIF socket and connecto
 
 Once you have configured a stripboard or breadboard and verified all the lines are correct as described above, flash the sketch to an Arduino MEGA.  Open the serial monitor at 115200 baud (Ctrl-Shft-M).  The serial monitor will prompt for a test pattern.  Enter the desired pattern and test results will print after completion.  The program will continue to loop, prompting for a test pattern.  
 
-<h1>Example breadboard</h1>
+<h1>Plug-in Prototyping Board with ZIF Socket</h1>
 
-![sram](https://user-images.githubusercontent.com/60443687/218157626-75c68b32-1c26-4c51-990b-c2bca77827a0.jpg)
+![ramtest](https://user-images.githubusercontent.com/60443687/218333159-e1cea653-8c0c-44a4-880e-5318a7e47ebf.jpg)
