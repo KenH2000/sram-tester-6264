@@ -292,6 +292,9 @@ void fulltest(){
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
     Serial.println(lastError, HEX);
+    Serial.println("----------RAM FAILED----------");
+  }else{
+    Serial.println("----------RAM PASSED----------");
   }
   Serial.println("******************************");
 }
@@ -336,9 +339,8 @@ void testpattern(int patterns[],int a, int b){
   
   Serial.println("Test complete*****************");
   printU64(errorCount);
-  Serial.print(" errors found (");
-  Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
-  Serial.println("% failed)");
+  Serial.println(" errors found.");
+  //Serial.print((100.f * errorCount) / (100.f * addressCount));
   digitalWrite(ledpin,HIGH);
   if (errorCount > 0) {
     digitalWrite(ledpin,LOW);
@@ -346,7 +348,9 @@ void testpattern(int patterns[],int a, int b){
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
     Serial.println(lastError, HEX);
+    Serial.println("----------RAM FAILED----------");
+  }else{
+    Serial.println("----------RAM PASSED----------");
   }
   Serial.println("******************************");
 }
-
