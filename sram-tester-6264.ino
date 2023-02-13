@@ -51,6 +51,10 @@ const WritePin writePins[] = {
 const uint32_t addressCount = 8192;
 
 int ledpin=13;
+int boardledpin[]={ 22, 24 }; //2 color LED on board
+unsigned long previousMillis =0;
+const long interval = 500;
+int chipstatus = 0;             //0 no errors;1 errors;2 testing
 // ------------------------------
 
 #define NX(x) (sizeof(x) / sizeof((x)[0]))
@@ -69,6 +73,8 @@ void specialpins() {
     pinMode(ipins[i],INPUT);
   }
 pinMode(ledpin,OUTPUT);
+pinMode(boardledpin[0],OUTPUT);
+pinMode(boardledpin[1],OUTPUT);
 }
 
 // Set Address pins to output
@@ -222,6 +228,32 @@ void printU64(uint64_t value) {
   }
 }
 
+void blink() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    if (chipstatus==0) { //no errors
+      if (digitalRead(boardledpin[0])!=HIGH) {digitalWrite(boardledpin[0],HIGH);}
+      if (digitalRead(boardledpin[1])!=LOW) {digitalWrite(boardledpin[1],LOW);}
+      if (digitalRead(ledpin)!=HIGH) {digitalWrite(ledpin,HIGH);}
+    }
+    if (chipstatus==1) { //errors
+      if (digitalRead(boardledpin[0])!=LOW) {digitalWrite(boardledpin[0],LOW);}
+      digitalWrite(boardledpin[1],!digitalRead(boardledpin[1]));
+      digitalWrite(ledpin,!digitalRead(ledpin));
+    }
+    if (chipstatus==2) { //testing
+      if (digitalRead(boardledpin[0])==digitalRead(boardledpin[1])) {
+        digitalWrite(boardledpin[0],!digitalRead(boardledpin[0]));
+      }
+      digitalWrite(boardledpin[0],!digitalRead(boardledpin[0]));
+      digitalWrite(boardledpin[1],!digitalRead(boardledpin[1]));
+      if (digitalRead(ledpin)!=LOW) {digitalWrite(ledpin,LOW);}
+    }
+    
+  }
+}
+
 void loop() {
   byte subcommand;
   #define ELS(x)   (sizeof(x) / sizeof(x[0]))
@@ -234,7 +266,7 @@ Serial.println("0 = 0's (FAST)");
 Serial.println("Enter Test Pattern (F,A,1 or 0):");
  do
       {
-      subcommand = toupper (Serial.read ());
+      subcommand = toupper (Serial.read ());blink();
       } while (subcommand != 'F' && subcommand != 'A' && subcommand != '1'  && subcommand != '0' && subcommand != ' ' );    
     if (subcommand == 'F') {fulltest();}
     if (subcommand == 'A') {testpattern(patterns,0,4);}
@@ -243,7 +275,7 @@ Serial.println("Enter Test Pattern (F,A,1 or 0):");
 }
 
 void fulltest(){
-  digitalWrite(ledpin,LOW);
+  chipstatus=2;
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
@@ -256,6 +288,7 @@ void fulltest(){
     
     // Loop through all addresses in the SRAM
     for (uint32_t addr = 0; addr < addressCount; addr++) {
+      blink();
       // Write test pattern to the SRAM
       writeData(addr, pattern);
       
@@ -285,9 +318,8 @@ void fulltest(){
   Serial.print(" errors found (");
   Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
   Serial.println("% failed)");
-  digitalWrite(ledpin,HIGH);
   if (errorCount > 0) {
-    digitalWrite(ledpin,LOW);
+    chipstatus=1;
     Serial.print("Error span: 0x");
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
@@ -295,13 +327,14 @@ void fulltest(){
     Serial.println("----------RAM FAILED----------");
   }else{
     Serial.println("----------RAM PASSED----------");
+    chipstatus=0;
   }
   Serial.println("******************************");
 }
 
 
 void testpattern(int patterns[],int a, int b){
-  digitalWrite(ledpin,LOW);
+  chipstatus=2;
   uint32_t firstError = 0;
   uint32_t lastError = 0;
   uint64_t errorCount = 0;
@@ -313,6 +346,7 @@ void testpattern(int patterns[],int a, int b){
     
     // Loop through all addresses in the SRAM
     for (uint32_t addr = 0; addr < addressCount; addr++) {
+      blink();
       // Write test pattern to the SRAM
       writeData(addr, patterns[i]);
       
@@ -341,9 +375,8 @@ void testpattern(int patterns[],int a, int b){
   printU64(errorCount);
   Serial.println(" errors found.");
   //Serial.print((100.f * errorCount) / (100.f * addressCount));
-  digitalWrite(ledpin,HIGH);
   if (errorCount > 0) {
-    digitalWrite(ledpin,LOW);
+    chipstatus=1;
     Serial.print("Error span: 0x");
     Serial.print(firstError, HEX);
     Serial.print(" to 0x");
@@ -351,6 +384,7 @@ void testpattern(int patterns[],int a, int b){
     Serial.println("----------RAM FAILED----------");
   }else{
     Serial.println("----------RAM PASSED----------");
+    chipstatus=0;
   }
   Serial.println("******************************");
 }
