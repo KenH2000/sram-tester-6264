@@ -26,4 +26,5 @@ Once you have configured a stripboard or breadboard and verified all the lines a
 
 <h1>Plug-in Prototyping Board with ZIF Socket</h1>
 
-![ramtest](https://user-images.githubusercontent.com/60443687/218333159-e1cea653-8c0c-44a4-880e-5318a7e47ebf.jpg)
+![tester2](https://user-images.githubusercontent.com/60443687/218546153-78ba93b4-9fef-47cd-ba27-16d408dba804.jpg)
+
