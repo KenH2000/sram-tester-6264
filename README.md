@@ -28,3 +28,6 @@ Once you have configured a stripboard or breadboard and verified all the lines a
 
 ![tester2](https://user-images.githubusercontent.com/60443687/218546153-78ba93b4-9fef-47cd-ba27-16d408dba804.jpg)
 
+<h1>LCD Standalone Tester</h1>
+
+![testerLCD](https://user-images.githubusercontent.com/60443687/219498883-a810ee96-7b99-4211-92c1-3df4749ae729.jpg)
