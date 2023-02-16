@@ -118,7 +118,7 @@ void setup() {
   setupWritePins();
   
   // Initialize Serial Port
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.println("Universal Static RAM Tester");
   Serial.print(NA);
   Serial.print('/');
