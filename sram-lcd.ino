@@ -369,7 +369,11 @@ void fulltest(){
     lcd.print("Testing    End->");
     lcd.setCursor(0,1);
     lcdprintBinary(pattern);
-    
+    int kbcount=1;
+    lcd.setCursor(0,0);
+    lcd.print("Test       ");
+    lcd.setCursor(11,0);
+    lcd.print("End->");
     // Loop through all addresses in the SRAM
     for (uint32_t addr = 0; addr < addressCount; addr++) {
       blink();
@@ -411,6 +415,12 @@ void fulltest(){
           do {blink();} while (checkButtons()==0);
           do {} while (checkButtons()!=0);
           return;
+        }
+      }else{
+        if (addr%1024==0){
+          lcd.setCursor(5,0);
+          lcd.print(String(kbcount)+"KB");
+          kbcount++;
         }
       }
       if (checkButtons()!=0) {
@@ -474,7 +484,11 @@ void testpattern(int patterns[],int a, int b){
     lcd.print("Testing         ");
     lcd.setCursor(0,1);
     lcdprintBinary(patterns[i]);
-    
+    int kbcount=1;
+    lcd.setCursor(0,0);
+    lcd.print("Test       ");
+    //lcd.setCursor(11,0);
+    //lcd.print("End->");
     // Loop through all addresses in the SRAM
     for (uint32_t addr = 0; addr < addressCount; addr++) {
       blink();
@@ -516,6 +530,12 @@ void testpattern(int patterns[],int a, int b){
           do {blink();} while (checkButtons()==0);
           do {} while (checkButtons()!=0);
           return;
+        }
+      }else{
+        if (addr%1024==0){
+          lcd.setCursor(5,0);
+          lcd.print(String(kbcount)+"KB");
+          kbcount++;
         }
       }
     }
