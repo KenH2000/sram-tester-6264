@@ -69,6 +69,7 @@ unsigned long lastDebounceTime = 0;
 int gobutton=8;
 int nxtbutton=9;
 int testno=1;
+int disp_every=1024;      //print test address every disp_every bytes
 boolean doserial=false;
 // ------------------------------
 
@@ -364,16 +365,11 @@ void fulltest(){
       Serial.print("Running test pattern ");
       printBinary(pattern);
       Serial.println();
-    }    
+    }
     lcd.setCursor(0,0);
-    lcd.print("Testing    End->");
-    lcd.setCursor(0,1);
+    lcd.print("Testing   End-->");
+    lcd.setCursor(8,1);
     lcdprintBinary(pattern);
-    int kbcount=1;
-    lcd.setCursor(0,0);
-    lcd.print("Test       ");
-    lcd.setCursor(11,0);
-    lcd.print("End->");
     // Loop through all addresses in the SRAM
     for (uint32_t addr = 0; addr < addressCount; addr++) {
       blink();
@@ -417,10 +413,9 @@ void fulltest(){
           return;
         }
       }else{
-        if (addr%1024==0){
-          lcd.setCursor(5,0);
-          lcd.print(String(kbcount)+"KB");
-          kbcount++;
+        if (addr%disp_every==0){
+          lcd.setCursor(0,1);
+          lcd.print(hexaddress(addr));
         }
       }
       if (checkButtons()!=0) {
@@ -482,11 +477,8 @@ void testpattern(int patterns[],int a, int b){
      }
     lcd.setCursor(0,0);
     lcd.print("Testing         ");
-    lcd.setCursor(0,1);
+    lcd.setCursor(8,1);
     lcdprintBinary(patterns[i]);
-    int kbcount=1;
-    lcd.setCursor(0,0);
-    lcd.print("Test       ");
     //lcd.setCursor(11,0);
     //lcd.print("End->");
     // Loop through all addresses in the SRAM
@@ -532,10 +524,9 @@ void testpattern(int patterns[],int a, int b){
           return;
         }
       }else{
-        if (addr%1024==0){
-          lcd.setCursor(5,0);
-          lcd.print(String(kbcount)+"KB");
-          kbcount++;
+        if (addr%disp_every==0){
+          lcd.setCursor(0,1);
+          lcd.print(hexaddress(addr));
         }
       }
     }
@@ -609,4 +600,16 @@ String u64tostring(uint64_t input) {
     result = c + result;
   } while (input);
   return result;
+}
+
+String hexaddress(uint32_t addr){
+  String zfill;
+  String h = String(addr,HEX);
+  h.toUpperCase();
+  int fillsz = String(addressCount,HEX).length();
+  for (int i=0;i<fillsz-h.length();i++){
+  zfill=zfill+"0";
+  }
+  zfill="0x"+zfill;
+  return (zfill+h);
 }
