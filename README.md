@@ -1,5 +1,7 @@
 # sram-tester-6264
 
+This tester is not currently working.  Reading and Writing a specific value to a specific address gives inconsistent results.  The cause is unknown.  
+
 ************************************************************
 
 This is a modified version of the original testers:
