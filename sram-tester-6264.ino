@@ -1,390 +1,262 @@
-/***************************************************************************
- * Universal Static RAM Tester - Tests SRAM by writing and reading patterns
- * This is a modified version of the original testers:
- * derived from the 2114 SRAM tester by Carsten Skjerk
- * https://github.com/skjerk/Arduino-2114-SRAM-tester
- * ***AND****
- * (c) Dennis Marttinen 2022
- * Licensed under the MIT license
- * https://github.com/twelho/sram-tester
- ***************************************************************************
- * This version tests the 6264 SRAM
- * and adds options to test the full pattern and other (FASTER) patterns.
- * 
- * The pin arrangement is organized so a ZIF socket can be mounted  
- * on a stripboard and directly plugged in to the MEGA 36 pin connector. 
- * 6264 SRAM (ATMega 2560 pinout)
- * IC Pin 14 (Vss) is jumpered to GND (MEGA pin is set to INPUT)
- * IC Pin 20 (CS) set on MEGA to OUTPUT LOW
- * IC Pin 22 (OE) set on MEGA to OUTPUT LOW
- * IC Pin 28 (Vcc) is jumpered to VCC (MEGA pin is set to INPUT)
-*/
+/*
+ROM Reader. Quick Arduino program to read a parallel-accessed ROM and dump it to the serial
+port in hex.
 
-struct WritePin {
-  uint8_t pin;
-  bool inverted;
-};
+Oddbloke. 16th Feb 2014.
+ */
 
-// ------------------------------
-//CS and OE configure to OUTPUT, LOW
-const uint8_t gpins[] = { 39, 43 };
+ //const char ADDR_PINS[] = {44, 42, 40, 38, 36, 34, 32, 30, 33, 35, 41, 37, 28};
+ //const char DATA_PINS[] = {46, 48, 50, 53, 51, 49, 47, 45}; //same for 6264 and 6116
+//    GND (pin 14), /CE (20), /OE (22) should be wired to ground.
+//    Vpp (pin 1), /PGM (pin 27), Vcc (pin 28) should be wired to +5 volts.
+static const int OE_PIN = 39;  //same for 6264 and 6116
+static const int CS_PIN = 43;  //same for 6264 and 6116
+static const int WE_PIN = 29;
+static const int vccpin = 27;  //jumpered from vcc
+static const int gndpin = 52;  //jumpered from gnd
 
-//direct wired to VCC and GND, configure as INPUT
-const uint8_t ipins[] = { 52, 27 };
+// How I've wired the digital pins on my Arduino to the address and data pins on
+// the ROM.
+static const int kPin_A0  = 44;
+static const int kPin_A1  = 42;
+static const int kPin_A2  = 40;
+static const int kPin_A3  = 38;
+static const int kPin_A4  = 36;
+static const int kPin_A5  = 34;
+static const int kPin_A6  = 32;
+static const int kPin_A7  = 30;
+static const int kPin_A8  = 33;
+static const int kPin_A9  = 35;
+static const int kPin_A10 = 41;
+static const int kPin_A11 = 37;
+static const int kPin_A12 = 28;
+static const int kPin_A13 = 31;
 
-// Address Pins
-const uint8_t addressPins[] = {
-  44, 42, 40, 38, 36, 34, 32, 30, 33, 35, 41, 37, 28
-};
+static const int kPin_D0 = 46;
+static const int kPin_D1 = 48;
+static const int kPin_D2 = 50;
+static const int kPin_D3 = 53;
+static const int kPin_D4 = 51;
+static const int kPin_D5 = 49;
+static const int kPin_D6 = 47;
+static const int kPin_D7 = 45;
 
-// Data Pins
-const uint8_t dataPins[] = {
-  46, 48, 50, 53, 51, 49, 47, 45
-};
+const char hex[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+              '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-// Write Pins
-const WritePin writePins[] = {
-  {29, true}, // (LOW = WRITE)
-};
-
-// The number of addressable memory locations
-const uint32_t addressCount = 8192;
-
-int ledpin=13;
-int boardledpin[]={ 22, 24 }; //2 color LED on board
-unsigned long previousMillis =0;
-const long interval = 500;
-int chipstatus = 0;             //0 no errors;1 errors;2 testing
-// ------------------------------
-
-#define NX(x) (sizeof(x) / sizeof((x)[0]))
-
-const size_t NA = NX(addressPins);
-const size_t ND = NX(dataPins);
-const size_t NW = NX(writePins);
-const size_t NS = NX(ipins);
-//int j;
-
-// Set up special pins
-void specialpins() {
-  for (size_t i=0;i<NS;i++) {
-    pinMode(gpins[i], OUTPUT);
-    digitalWrite(gpins[i],LOW);
-    pinMode(ipins[i],INPUT);
-  }
-pinMode(ledpin,OUTPUT);
-pinMode(boardledpin[0],OUTPUT);
-pinMode(boardledpin[1],OUTPUT);
-}
-
-// Set Address pins to output
-void setupAddressPins() {
-  for (size_t i = 0; i < NA; i++) {
-    pinMode(addressPins[i], OUTPUT);
-  }
-}
-
-// Set Data pins to output
-void setDataPinsOutput() {
-  for (size_t i = 0; i < ND; i++) {
-    pinMode(dataPins[i], OUTPUT);
-  }
-}
-
-// Set Data pins to input
-void setDataPinsInput() {
-  for (size_t i = 0; i < ND; i++) {
-    // Explicitly set them LOW or else this reads its own output
-    digitalWrite(dataPins[i], LOW);
-    pinMode(dataPins[i], INPUT);
-  }
-}
-
-// Set Write pins to output
-void setupWritePins() {
-  for (size_t i = 0; i < NW; i++) {
-    pinMode(writePins[i].pin, OUTPUT);
-  }
-}
-
-// Initial setup of pins and serial monitor
-void setup() {
-  // Initialize special pins
-  specialpins();
+void setup()
+{
+  pinMode(CS_PIN, OUTPUT);
+  pinMode(OE_PIN, OUTPUT);
+  pinMode(WE_PIN, OUTPUT);
+  pinMode(vccpin,INPUT);
+  pinMode(gndpin,INPUT);
   
-  // Initialize all pins
-  setupAddressPins();
-  setDataPinsOutput();
-  setupWritePins();
-  
-  // Initialize Serial Port
+  // set the address lines as outputs ...
+  pinMode(kPin_A0, OUTPUT);     
+  pinMode(kPin_A1, OUTPUT);     
+  pinMode(kPin_A2, OUTPUT);     
+  pinMode(kPin_A3, OUTPUT);     
+  pinMode(kPin_A4, OUTPUT);     
+  pinMode(kPin_A5, OUTPUT);     
+  pinMode(kPin_A6, OUTPUT);     
+  pinMode(kPin_A7, OUTPUT);     
+  pinMode(kPin_A8, OUTPUT);     
+  pinMode(kPin_A9, OUTPUT);     
+  pinMode(kPin_A10, OUTPUT);     
+  pinMode(kPin_A11, OUTPUT);     
+  pinMode(kPin_A12, OUTPUT);     
+  pinMode(kPin_A13, OUTPUT);
+ 
   Serial.begin(9600);
-  Serial.println("Universal Static RAM Tester");
-  Serial.print(NA);
-  Serial.print('/');
-  Serial.print(ND);
-  Serial.print('/');
-  Serial.print(NW);
-  Serial.println(" address/data/write pin(s) configured");
 }
 
-// Set the address pins to match the specified address
-void setAddressBits(size_t address) {
-  for (size_t i = 0; i < NA; i++) {
-    digitalWrite(addressPins[i], bitRead(address, i));
-  }
+void setpinsread(){
+  // set the data lines as inputs ...
+  pinMode(kPin_D0, INPUT); 
+  pinMode(kPin_D1, INPUT); 
+  pinMode(kPin_D2, INPUT); 
+  pinMode(kPin_D3, INPUT); 
+  pinMode(kPin_D4, INPUT); 
+  pinMode(kPin_D5, INPUT); 
+  pinMode(kPin_D6, INPUT); 
+  pinMode(kPin_D7, INPUT); 
+}
+void setpinswrite(){
+  // set the data lines as inputs ...
+  pinMode(kPin_D0, OUTPUT); 
+  pinMode(kPin_D1, OUTPUT); 
+  pinMode(kPin_D2, OUTPUT); 
+  pinMode(kPin_D3, OUTPUT); 
+  pinMode(kPin_D4, OUTPUT); 
+  pinMode(kPin_D5, OUTPUT); 
+  pinMode(kPin_D6, OUTPUT); 
+  pinMode(kPin_D7, OUTPUT); 
+  digitalWrite(kPin_D0, LOW);
+  digitalWrite(kPin_D1, LOW);
+  digitalWrite(kPin_D2, LOW);
+  digitalWrite(kPin_D3, LOW);
+  digitalWrite(kPin_D4, LOW);
+  digitalWrite(kPin_D5, LOW);
+  digitalWrite(kPin_D6, LOW);
+  digitalWrite(kPin_D7, LOW);
 }
 
-// Set the data pins to match the specified value
-void setDataBits(size_t value) {
-  for (size_t i = 0; i < ND; i++) {
-    digitalWrite(dataPins[i], bitRead(value, i));
-  }
+void SetAddress(int addr)
+{
+  // update the address lines to reflect the address we want ...
+  digitalWrite(kPin_A0, (addr & 1)?HIGH:LOW);
+  digitalWrite(kPin_A1, (addr & 2)?HIGH:LOW);
+  digitalWrite(kPin_A2, (addr & 4)?HIGH:LOW);
+  digitalWrite(kPin_A3, (addr & 8)?HIGH:LOW);
+  digitalWrite(kPin_A4, (addr & 16)?HIGH:LOW);
+  digitalWrite(kPin_A5, (addr & 32)?HIGH:LOW);
+  digitalWrite(kPin_A6, (addr & 64)?HIGH:LOW);
+  digitalWrite(kPin_A7, (addr & 128)?HIGH:LOW);
+  digitalWrite(kPin_A8, (addr & 256)?HIGH:LOW);
+  digitalWrite(kPin_A9, (addr & 512)?HIGH:LOW);
+  digitalWrite(kPin_A10, (addr & 1024)?HIGH:LOW);
+  digitalWrite(kPin_A11, (addr & 2048)?HIGH:LOW);
+  digitalWrite(kPin_A12, (addr & 4096)?HIGH:LOW);
+  digitalWrite(kPin_A13, (addr & 8192)?HIGH:LOW);
 }
 
-void enableWritePins() {
-  for (size_t i = 0; i < NW; i++) {
-    const WritePin* p = &writePins[i];
-    digitalWrite(p->pin, !p->inverted);
+void writebyte(int val){
+  digitalWrite(OE_PIN,LOW);
+  digitalWrite(WE_PIN,LOW);  
+  digitalWrite(CS_PIN,HIGH);
+  digitalWrite(kPin_D0, (val & 1)?HIGH:LOW);
+  digitalWrite(kPin_D1, (val & 2)?HIGH:LOW);
+  digitalWrite(kPin_D2, (val & 4)?HIGH:LOW);
+  digitalWrite(kPin_D3, (val & 8)?HIGH:LOW);
+  digitalWrite(kPin_D4, (val & 16)?HIGH:LOW);
+  digitalWrite(kPin_D5, (val & 32)?HIGH:LOW);
+  digitalWrite(kPin_D6, (val & 64)?HIGH:LOW);
+  digitalWrite(kPin_D7, (val & 128)?HIGH:LOW);
+  digitalWrite(CS_PIN,LOW);
   }
+
+byte ReadByte()
+{
+  digitalWrite(CS_PIN,LOW);
+  digitalWrite(OE_PIN,LOW);
+  digitalWrite(WE_PIN,HIGH);  
+  // read the current eight-bit byte being output by the ROM ...
+  byte b = 0;
+  if (digitalRead(kPin_D0)) b |= 1;  
+  if (digitalRead(kPin_D1)) b |= 2;  
+  if (digitalRead(kPin_D2)) b |= 4;  
+  if (digitalRead(kPin_D3)) b |= 8;  
+  if (digitalRead(kPin_D4)) b |= 16; 
+  if (digitalRead(kPin_D5)) b |= 32; 
+  if (digitalRead(kPin_D6)) b |= 64; 
+  if (digitalRead(kPin_D7)) b |= 128;
+  return(b);
 }
 
-void disableWritePins() {
-  for (size_t i = 0; i < NW; i++) {
-    const WritePin* p = &writePins[i];
-    digitalWrite(p->pin, p->inverted);
-  }
-}
-
-// Write data to the specified memory address
-void writeData(size_t address, size_t data) {
-  // Set data pins to output
-  setDataPinsOutput();
-  
-  // Set address bits
-  setAddressBits(address);
-
-  // Set data bits
-  setDataBits(data);
-  
-  // Enable Write pins
-  enableWritePins();
-
-  // Wait for the logic to be stabilized
-  //delay(1);
-  
-  // Disable Write pins
-  disableWritePins();
-
-  // Wait a bit for the write to commit
-  //delay(1);
-}
-
-// Read data from the specified memory address
-// Note that the Write pins must already be in READ mode
-size_t readData(size_t address) {
-  // Set data pins to input
-  setDataPinsInput();
-  
-  // Set address bits
-  setAddressBits(address);
-  
-  // Wait for the logic to be stabilized
-  //delay(1);
-
-  // Read each data bit one by one
-  size_t result = 0;
-  for (size_t i = 0; i < ND; i++) {
-    bitWrite(result, i, digitalRead(dataPins[i]));
-  }
-  return result;
-}
-
-// Output binary value from the ND bit data
-void printBinary(size_t data) {
-  for (size_t b = ND; b > 0; b--) {
-    Serial.print(bitRead(data, b - 1));
-  }
-}
-
-// Print an unsigned 64-bit integer
-void printU64(uint64_t value) {
-  if (value == 0) {
-      Serial.print('0');
-      return;
-  }
-  
-  unsigned char buf[20];
-  uint8_t i = 0;
-  
-  while (value > 0) {
-      uint64_t q = value/10;
-      buf[i++] = value - q * 10;
-      value = q;
-  }
-  
-  for (; i > 0; i--) {
-    Serial.print((char) ('0' + buf[i - 1]));
-  }
-}
-
-void blink() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    if (chipstatus==0) { //no errors
-      if (digitalRead(boardledpin[0])!=HIGH) {digitalWrite(boardledpin[0],HIGH);}
-      if (digitalRead(boardledpin[1])!=LOW) {digitalWrite(boardledpin[1],LOW);}
-      if (digitalRead(ledpin)!=HIGH) {digitalWrite(ledpin,HIGH);}
-    }
-    if (chipstatus==1) { //errors
-      if (digitalRead(boardledpin[0])!=LOW) {digitalWrite(boardledpin[0],LOW);}
-      digitalWrite(boardledpin[1],!digitalRead(boardledpin[1]));
-      digitalWrite(ledpin,!digitalRead(ledpin));
-    }
-    if (chipstatus==2) { //testing
-      if (digitalRead(boardledpin[0])==digitalRead(boardledpin[1])) {
-        digitalWrite(boardledpin[0],!digitalRead(boardledpin[0]));
-      }
-      digitalWrite(boardledpin[0],!digitalRead(boardledpin[0]));
-      digitalWrite(boardledpin[1],!digitalRead(boardledpin[1]));
-      if (digitalRead(ledpin)!=LOW) {digitalWrite(ledpin,LOW);}
-    }
-    
-  }
-}
-
-void loop() {
+void loop()
+{
   byte subcommand;
-  #define ELS(x)   (sizeof(x) / sizeof(x[0]))
-  int patterns[]={0xAA,0x55,0x00,0xFF};
-Serial.println("Choose Test Pattern:");
-Serial.println("F = Full Test (SLOW)");
-Serial.println("A = Alt  Test (FAST)");
-Serial.println("1 = 1's (FAST)");
-Serial.println("0 = 0's (FAST)");
-Serial.println("Enter Test Pattern (F,A,1 or 0):");
+//  int patterns[]={0xAA,0x55,0x00,0xFF};
+Serial.println("Choose Test:");
+Serial.println("T = Test ");
+Serial.println("R = Read ");
+Serial.println("Enter Test (T/R):");
  do
       {
-      subcommand = toupper (Serial.read ());blink();
-      } while (subcommand != 'F' && subcommand != 'A' && subcommand != '1'  && subcommand != '0' && subcommand != ' ' );    
-    if (subcommand == 'F') {fulltest();}
-    if (subcommand == 'A') {testpattern(patterns,0,4);}
-    if (subcommand == '1') {testpattern(patterns,3,4);}
-    if (subcommand == '0') {testpattern(patterns,2,3);}
-}
+      subcommand = toupper (Serial.read ());
+      } while (subcommand != 'T' && subcommand != 'R' && subcommand != ' ' );    
+    if (subcommand == 'T') {testwrite();}
+    if (subcommand == 'R') {readic();}    
+ }
 
-void fulltest(){
-  chipstatus=2;
-  uint32_t firstError = 0;
-  uint32_t lastError = 0;
-  uint64_t errorCount = 0;
-  
-  // Use all possible values for data patterns
-  for (size_t pattern = 0; pattern < bit(ND); pattern++) {
-    Serial.print("Running test pattern ");
-    printBinary(pattern);
-    Serial.println();
-    
-    // Loop through all addresses in the SRAM
-    for (uint32_t addr = 0; addr < addressCount; addr++) {
-      blink();
-      // Write test pattern to the SRAM
-      writeData(addr, pattern);
-      
-      // Read data from the SRAM
-      size_t data = readData(addr);
+void testwrite(){
+  byte d[16];
+  int x, y, addr,val; 
 
-      // Verify
-      if (data != pattern) {
-        lastError = addr;
-        if (errorCount++ == 0) {
-          firstError = addr;
-        }
-        
-        Serial.print("Error at address 0x");
-        Serial.print(addr, HEX);
-        Serial.print(" - Got: ");
-        printBinary(data);
-        Serial.print(", expected: ");
-        printBinary(pattern);
-        Serial.println();
-      }
+  val=170; //aa
+  Serial.println("Writing 0xAA to 0x100 addresses");
+  setpinswrite();
+  for (addr = 0; addr < 256; addr ++)
+    {
+     SetAddress(addr);
+     writebyte(val);    
     }
-  }
-  
-  Serial.println("Test complete*****************");
-  printU64(errorCount);
-  Serial.print(" errors found (");
-  Serial.print((100.f * errorCount) / ((float)bit(ND) * addressCount));
-  Serial.println("% failed)");
-  if (errorCount > 0) {
-    chipstatus=1;
-    Serial.print("Error span: 0x");
-    Serial.print(firstError, HEX);
-    Serial.print(" to 0x");
-    Serial.println(lastError, HEX);
-    Serial.println("----------RAM FAILED----------");
-  }else{
-    Serial.println("----------RAM PASSED----------");
-    chipstatus=0;
-  }
-  Serial.println("******************************");
-}
-
-
-void testpattern(int patterns[],int a, int b){
-  chipstatus=2;
-  uint32_t firstError = 0;
-  uint32_t lastError = 0;
-  uint64_t errorCount = 0;
-  // Use values for patterns array
-   for (size_t i = a; i < b; i++) {
-    Serial.print("Running test pattern ");
-    printBinary(patterns[i]);
-    Serial.println();
     
-    // Loop through all addresses in the SRAM
-    for (uint32_t addr = 0; addr < addressCount; addr++) {
-      blink();
-      // Write test pattern to the SRAM
-      writeData(addr, patterns[i]);
-      
-      // Read data from the SRAM
-      size_t data = readData(addr);
-
-      // Verify
-      if (data != patterns[i]) {
-        lastError = addr;
-        if (errorCount++ == 0) {
-          firstError = addr;
-        }
-        
-        Serial.print("Error at address 0x");
-        Serial.print(addr, HEX);
-        Serial.print(" - Got: ");
-        printBinary(data);
-        Serial.print(", expected: ");
-        printBinary(patterns[i]);
-        Serial.println();
-      }
+  Serial.println("Reading 0x100 addresses");
+  setpinsread();
+  for (addr = 0; addr < 256; addr += 16)
+  {
+    // read 16 bytes of data from the ROM ...
+    for (x = 0; x < 16; x++)
+    {
+      SetAddress(addr + x); // tells the ROM the byte we want ...
+      d[x] = ReadByte(); // reads the byte back from the ROM
     }
+  
+    // now we'll print each byte in hex ...
+    for (y = 0; y < 16; y++)
+    {
+      Serial.print(hex[ (d[y] & 0xF0) >> 4  ]);
+      Serial.print(hex[ (d[y] & 0x0F)       ]);
+    }
+          
+    // and print an ASCII dump too ...
+    
+    Serial.print(" ");
+    for (y = 0; y < 16; y++)
+    {
+      char c = '.';
+      if (d[y] > 32 && d[y]<127) c = d[y];
+      Serial.print(c);
+    }
+      
+    Serial.println("");
   }
   
-  Serial.println("Test complete*****************");
-  printU64(errorCount);
-  Serial.println(" errors found.");
-  //Serial.print((100.f * errorCount) / (100.f * addressCount));
-  if (errorCount > 0) {
-    chipstatus=1;
-    Serial.print("Error span: 0x");
-    Serial.print(firstError, HEX);
-    Serial.print(" to 0x");
-    Serial.println(lastError, HEX);
-    Serial.println("----------RAM FAILED----------");
-  }else{
-    Serial.println("----------RAM PASSED----------");
-    chipstatus=0;
   }
-  Serial.println("******************************");
+
+void readic(){
+  byte d[16];
+  int x, y, addr; 
+  // The only reason I'm choosing to read in blocks of 16 bytes
+  // is to keep the hex-dump code simple. You could just as easily
+  // read a single byte at a time if that's all you needed.
+  
+  Serial.println("Reading ROM ...\n");
+  setpinsread();
+
+//  for (addr = 0; addr < 16384; addr += 16)
+  for (addr = 0; addr < 512; addr += 16)
+  {
+    // read 16 bytes of data from the ROM ...
+    for (x = 0; x < 16; x++)
+    {
+      SetAddress(addr + x); // tells the ROM the byte we want ...
+      d[x] = ReadByte(); // reads the byte back from the ROM
+    }
+  
+    // now we'll print each byte in hex ...
+    for (y = 0; y < 16; y++)
+    {
+      Serial.print(hex[ (d[y] & 0xF0) >> 4  ]);
+      Serial.print(hex[ (d[y] & 0x0F)       ]);
+    }
+          
+    // and print an ASCII dump too ...
+    
+    Serial.print(" ");
+    for (y = 0; y < 16; y++)
+    {
+      char c = '.';
+      if (d[y] > 32 && d[y]<127) c = d[y];
+      Serial.print(c);
+    }
+      
+    Serial.println("");
+  }
+  
+  // All done, so lockup ...
+  //while (true) {delay(10000);}
+
 }
